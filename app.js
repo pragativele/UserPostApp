@@ -18,9 +18,30 @@ app.get('/', (req, res) => {
 //protected route
 app.get('/profile', isLoggedIn, async (req, res) => {
         //coz user store postid bt we want to display post content that's why populate is used
-
     let user = await userModel.findOne({email: req.user.email}).populate("posts");
     res.render("profile", {user});
+})
+
+app.get('/like/:id', isLoggedIn, async (req, res) => {
+    let post = await postModel.findOne({_id: req.params.id}).populate("user");
+
+    //checking if userid is present or not
+    //if no then add id into likes else remove id
+    if(post.likes.indexOf(req.user.userid) == -1){
+        post.likes.push(req.user.userid);
+    }else{
+        //splice means remove
+        //it remove the index of userid which already present
+        post.likes.splice(post.likes.indexOf(req.user.userid), 1);
+    }
+
+    await post.save();
+    res.redirect("/profile");
+})
+
+app.get('/edit/:id', isLoggedIn, async (req, res) => {
+    let post = await postModel.findOne({_id: req.params.id}).populate("user");
+    res.render("edit", {post});
 })
 
 app.post('/post', isLoggedIn, async(req, res) => {
@@ -36,6 +57,11 @@ app.post('/post', isLoggedIn, async(req, res) => {
     //pushing postid into user post array
     user.posts.push(post._id);
     await user.save();
+    res.redirect("/profile");
+})
+
+app.post('/update/:id', isLoggedIn, async(req, res) => {
+    let post = await postModel.findOneAndUpdate({_id: req.params.id}, {content: req.body.content});
     res.redirect("/profile");
 })
 

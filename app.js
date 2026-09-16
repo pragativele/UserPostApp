@@ -15,9 +15,28 @@ app.get('/', (req, res) => {
     res.render("index");
 })
 
-app.get('/profile', isLoggedIn, (req, res) => {
-    console.log(req.user);
-    res.render("login");
+//protected route
+app.get('/profile', isLoggedIn, async (req, res) => {
+        //coz user store postid bt we want to display post content that's why populate is used
+
+    let user = await userModel.findOne({email: req.user.email}).populate("posts");
+    res.render("profile", {user});
+})
+
+app.post('/post', isLoggedIn, async(req, res) => {
+    let user = await userModel.findOne({email: req.user.email});
+    //retrieving the content from
+    let content = req.body.content;
+    //creating of post
+    let post = await postModel.create({
+        user: user._id,
+        content
+    })
+
+    //pushing postid into user post array
+    user.posts.push(post._id);
+    await user.save();
+    res.redirect("/profile");
 })
 
 app.get('/login', (req, res) => {
@@ -25,9 +44,12 @@ app.get('/login', (req, res) => {
 })
 
 app.post('/register', async(req, res) => {
+    //deconstructing
     let {email, name, password, username, age} = req.body;
+    //if user is already present
     let user = await userModel.findOne({email});
     if(user) return res.status(500).send("user already register");
+    //creating salt for pass
     bcrypt.genSalt(10, (err, salt) => {
         bcrypt.hash(password, salt, async(err, hash) => {
             let user = await userModel.create({
@@ -57,7 +79,7 @@ app.post('/login', async(req, res) => {
         if(result){ 
             let token = jwt.sign({email: email, userid: user._id}, "shh");
             res.cookie("token", token);
-            res.status(200).send("you can login");
+            res.status(200).redirect("/profile");
         }
         else res.redirect("/login");
     })
@@ -70,7 +92,7 @@ app.get('/logout', (req, res) => {
 
 //middleware
 function isLoggedIn(req, res, next){
-    if(req.cookies.token == "") res.send("you must be logged in");
+    if(req.cookies.token == "") res.redirect("/login");
     else{
         let data = jwt.verify(req.cookies.token, "shh");
         req.user = data;
